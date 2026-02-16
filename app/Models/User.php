@@ -27,6 +27,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'type',
+        'patient_id',
     ];
 
     /**
@@ -51,6 +52,21 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'age' => 'integer',
         ];
+    }
+
+    /**
+     * Boot method to auto-generate patient_id
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::created(function ($user) {
+            if ($user->type === 'patient' && empty($user->patient_id)) {
+                $user->patient_id = 'UF' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
+                $user->save();
+            }
+        });
     }
 
     /**
@@ -80,5 +96,21 @@ class User extends Authenticatable implements MustVerifyEmail
         } else {
             parent::sendPasswordResetNotification($token);
         }
+    }
+
+    /**
+     * Get the user's profile.
+     */
+    public function profile()
+    {
+        return $this->hasOne(Profile::class);
+    }
+
+    /**
+     * Get the user's appointments.
+     */
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
     }
 }

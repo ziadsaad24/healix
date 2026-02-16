@@ -3,13 +3,17 @@
 namespace App\Notifications;
 
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 
-class PatientEmailVerification extends VerifyEmail
+class PatientEmailVerification extends VerifyEmail implements ShouldQueue
 {
+    use Queueable;
+
     /**
      * Get the verification URL for the given notifiable.
      *

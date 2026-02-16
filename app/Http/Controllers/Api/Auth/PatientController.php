@@ -2,11 +2,11 @@
 namespace App\Http\Controllers\Api\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientResource;
-use App\Models\Patient;
 use App\Models\User;
 use Hash;
 use Illuminate\Http\Request;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -21,10 +21,11 @@ class PatientController extends Controller
         $data=$request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'age' => 'nullable|integer',
+            'age' => 'nullable|integer|min:1|max:150',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
         ]);
+        
         $data['password']=Hash::make($data['password']);
         $user=User::create([
             'first_name' => $data['first_name'],
@@ -35,15 +36,13 @@ class PatientController extends Controller
             'type' => 'patient',
         ]);
 
-    // Send email verification notification
-    $user->sendEmailVerificationNotification();
+        // Send email verification notification
+        $user->sendEmailVerificationNotification();
 
-    $token = $user->createToken('auth_token')->plainTextToken;
-    return response()->json([
-        'message' => 'Patient registered successfully. Please check your email to verify your account.',
-        'user' => new PatientResource($user),
-        'token' => $token,
-    ], 201);
+        return response()->json([
+            'message' => 'Patient registered successfully. Please check your email to verify your account.',
+            'user' => new PatientResource($user),
+        ], 201);
     }
 
     
@@ -53,7 +52,9 @@ class PatientController extends Controller
             'email' => 'required|string|email',
             'password' => 'required|string',
         ]);
-        $user=User::where('email',$data['email'])->first();
+        
+        $user=User::where('email',$data['email'])->where('type', 'patient')->first();
+        
         if(!$user || !Hash::check($data['password'],$user->password)){
             return response()->json([
                 'message' => 'Invalid credentials'
@@ -100,7 +101,7 @@ class PatientController extends Controller
     {
         $user = User::find($request->route('id'));
 
-        if (!$user) {
+        if (!$user || $user->type !== 'patient') {
             return response()->json([
                 'message' => 'User not found'
             ], 404);
@@ -174,12 +175,12 @@ class PatientController extends Controller
         $token = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         
         // Delete any existing tokens for this email
-        \DB::table('password_reset_tokens')
+        DB::table('password_reset_tokens')
             ->where('email', $request->email)
             ->delete();
 
         // Store the new token
-        \DB::table('password_reset_tokens')->insert([
+        DB::table('password_reset_tokens')->insert([
             'email' => $request->email,
             'token' => Hash::make($token),
             'created_at' => now(),
@@ -213,7 +214,7 @@ class PatientController extends Controller
         }
 
         // Find the token record
-        $resetRecord = \DB::table('password_reset_tokens')
+        $resetRecord = DB::table('password_reset_tokens')
             ->where('email', $request->email)
             ->first();
 
@@ -225,7 +226,7 @@ class PatientController extends Controller
 
         // Check if token is expired (60 minutes)
         if (now()->diffInMinutes($resetRecord->created_at) > 60) {
-            \DB::table('password_reset_tokens')
+            DB::table('password_reset_tokens')
                 ->where('email', $request->email)
                 ->delete();
 
@@ -246,7 +247,7 @@ class PatientController extends Controller
         $user->save();
 
         // Delete the token
-        \DB::table('password_reset_tokens')
+        DB::table('password_reset_tokens')
             ->where('email', $request->email)
             ->delete();
 
@@ -258,5 +259,58 @@ class PatientController extends Controller
         ], 200);
     }
 
+    /**
+     * Get public patient records by patient ID (for QR code scanning)
+     * Public endpoint - no authentication required
+     */
+    public function publicRecords($patient_id)
+    {
+        $user = User::where('patient_id', $patient_id)->where('type', 'patient')->first();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Patient not found'
+            ], 404);
+        }
+        
+        // Get patient profile
+        $profile = $user->profile;
+        
+        // Get recent appointments
+        $appointments = $user->appointments()
+            ->latest('appointment_date')
+            ->limit(10)
+            ->get();
+        
+        return response()->json([
+            'success' => true,
+            'patient' => [
+                'patient_id' => $user->patient_id,
+                'name' => $user->first_name . ' ' . $user->last_name,
+                'gender' => $profile->gender ?? 'N/A',
+                'blood_type' => $profile->blood_group ?? 'N/A',
+                'age' => $profile->date_of_birth ? \Carbon\Carbon::parse($profile->date_of_birth)->age : null,
+                'city' => $profile->city ?? 'N/A',
+            ],
+            'medical_info' => [
+                'allergies' => $profile->drug_allergies ?? 'None',
+                'chronic_diseases' => $profile->chronic_diseases ?? [],
+                'current_medications' => $profile->long_term_medications ?? [],
+                'height' => $profile->height ?? null,
+                'weight' => $profile->weight ?? null,
+            ],
+            'appointments' => $appointments->map(function($apt) {
+                return [
+                    'date' => $apt->appointment_date,
+                    'doctor_name' => $apt->doctor_name,
+                    'specialty' => $apt->doctor_specialty,
+                    'diagnosis' => $apt->diagnosis,
+                    'disease' => $apt->disease_name,
+                ];
+            }),
+            'emergency_contact' => $profile->emergency_contact ?? 'N/A',
+        ], 200);
+    }
  
 }
