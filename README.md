@@ -1179,14 +1179,6 @@ See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📞 Support & Contact
-
-### Get Help
-
-- 📧 **Email:** support@healx.com
-- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/ziadsaad24/healix/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/ziadsaad24/healix/discussions)
-- 📖 **Documentation:** See the docs folder
 
 ### Quick Links
 
