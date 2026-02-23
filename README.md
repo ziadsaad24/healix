@@ -1255,7 +1255,7 @@ This software is provided "as is" for development and educational purposes. The 
 
 ## ⭐ Star This Repository
 
-**If you find Healx useful, please consider giving it a star!**
+**If you find Healix useful, please consider giving it a star!**
 
 [![GitHub stars](https://img.shields.io/github/stars/ziadsaad24/healix?style=social)](https://github.com/ziadsaad24/healix/stargazers)
 
